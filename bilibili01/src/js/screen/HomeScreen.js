@@ -22,6 +22,7 @@ import UserScreen from './UserScreen';
 
 //查看是否有联网权限
 // let internet = PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.INTERNET)
+const ipv4Address  = '10.4.122.130';//本机
 let pageNum = 1;//当前第几页
 let totalPage = 3;//总的页数
 //本页面的长宽
@@ -52,16 +53,15 @@ export default class HomeScreen extends React.Component {
             // 下拉用数据
             showFoot: 0, // 控制foot， 0：隐藏footer  1：已加载完成,没有更多数据   2 ：显示加载中
             isRefreshing: false,//下拉控制
-            isLoadmenu: false,
+            isLoadmenu: false,//是否是进入个人界面判别
         }
     }
     componentDidMount() {
-        // this._retrieveData();
         this._fetchData(this.getmyDate(), pageNum);
     }
     //网络请求==获取第pageNum页数据
     _fetchData = (gmtCreate) => {
-        fetch('http://10.2.200.119:8002/backend/bili/listBilibilis/' + '?gmtCreate=' + gmtCreate + '?pageNum=' + pageNum)
+        fetch('http://'+ipv4Address+':8002/backend/bili/listBilibilis/' + '?gmtCreate=' + gmtCreate + '?pageNum=' + pageNum)
             .then((response) => response.json())
             .then((response) => {
                 let dataArray = response.data;
@@ -121,11 +121,11 @@ export default class HomeScreen extends React.Component {
                         </TouchableOpacity>
                     </View>
 
-                    <Button title="开启网络权限"
+                    {/* <Button title="开启网络权限"
                         onPress={this.requestInternetPermission.bind(this)}
-                    ></Button>
+                    ></Button> */}
 
-                    <Text>{this.state.data.length}</Text>
+                    {/* <Text>{this.state.data.length}</Text> */}
                     <FlatList
                         extraData={this.state}
                         renderItem={(item, index) => this.renderRow(item, index)}
@@ -294,7 +294,7 @@ export default class HomeScreen extends React.Component {
                         style={{ flexDirection: 'column', paddingLeft: 15, paddingTop: 20 }}>
                         <TouchableOpacity style={{ width: 60, height: 60, borderRadius: 50, overflow: 'hidden', borderColor: '#000' }}
                             onPress={() => {
-                                this.props.navigation.navigate('UserScreen', { userPicture: this.state.userPicture, userAccount: this.state.userAccount, isLoadmenu: this.state.isLoadmenu });
+                                this.props.navigation.navigate('UserScreen', {userUuid: this.state.userUuid,userPicture: this.state.userPicture, userAccount: this.state.userAccount, isLoadmenu: this.state.isLoadmenu });
                             }
                             }>
                             <Image style={{ height: 60, width: 60 }} source={{ uri: this.state.userPicture }} />
@@ -340,10 +340,12 @@ export default class HomeScreen extends React.Component {
                                 isLoadmenu: true,
                                 errorInfo: error,
                             })
+                            ToastAndroid.show("返回成功 ", ToastAndroid.SHORT);
                         }else{
                             this.setState({
                                 userPicture: 'http://pic.616pic.com/ys_img/00/07/79/0iVLGX0QS6.jpg',
                                 userAccount: '未登录',
+                                isLoadmenu: false,
                             })
                         }
                         // alert('取值成功:' + result);

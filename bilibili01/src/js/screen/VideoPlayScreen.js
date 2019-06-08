@@ -1,10 +1,12 @@
 import React, { Component } from 'react';
-import { View, Dimensions, Image, Text, Slider, TouchableWithoutFeedback, TouchableOpacity, Button, StyleSheet } from 'react-native';
+import { View, Dimensions, Image, Text, Slider, TouchableWithoutFeedback, TouchableOpacity, Button, StyleSheet, Alert, AsyncStorage, ToastAndroid, } from 'react-native';
 import Video from 'react-native-video';
 import Orientation from 'react-native-orientation';
+// import { ipv4Address } from './HomeScreen';
 
 const screenWidth = Dimensions.get('window').width;
 
+const ipv4Address = '10.4.122.130';//本机
 function formatTime(second) {
   let h = 0, i = 0, s = parseInt(second);
   if (s > 60) {
@@ -18,22 +20,32 @@ function formatTime(second) {
   return [zero(h), zero(i), zero(s)].join(":");
 }
 
+
 export default class VideoPlayScreen extends React.Component {
 
-  static navigationOptions =({navigation})=>({
-    title:navigation.state.params.biliUuid
-  }) 
+  static navigationOptions = ({ navigation }) => ({
+    title: navigation.state.params.biliUuid
+  })
   static navigationOptions = {
     header: null,
   }
 
   constructor(props) {
     super(props);
+    props.navigation.addListener("willFocus", this._retrieveData)
     this.state = {
-      videoUrl: "http://124.129.157.208:8810/SD/2017qingdao/xiaoxueEnglish/grade3/b/1.mp4",
+
+      userUuid: '',
+      isLoadmenu: false,//是否是进入个人界面判别
+      userPicture: 'http://pic.616pic.com/ys_img/00/07/79/0iVLGX0QS6.jpg',
+      userAccount: '未登录',
+      userUuid: '',
+
+      videoUrl: '',
       // videoCover: "http://124.129.157.208:8889/data/uploads/kecheng/2018/01/18/5a600b2c99836.png@0o_0l_220w.png",
       biliUuid: props.navigation.state.params.biliUuid,
       biliData: [],
+      iscollection: false,//是否已经收藏i6
       videoWidth: screenWidth,
       videoHeight: screenWidth * 9 / 16, // 默认16：9的宽高比
       showVideoCover: true,    // 是否显示视频封面
@@ -43,34 +55,129 @@ export default class VideoPlayScreen extends React.Component {
       duration: 0,           // 视频的总时长
       isFullScreen: false,     // 当前是否全屏显示
       playFromBeginning: false, // 是否从头开始播放
+
+      iscollecting: false,//是否已经收藏
+      iscollectingLoad: false,//第一次查看视频是否收藏
     };
   }
   componentDidMount() {
-    this._fetchbiliData(this.state.biliUuid)
+    this._fetchbiliData(this.state.biliUuid);
   }
 
   _fetchbiliData = (biliUuid) => {
-    fetch('http://10.2.200.119:8002/backend/bili/getBilibiliById/' + biliUuid)
-      // Alert.alert('标题内容', '正文内容')
+    fetch('http://' + ipv4Address + ':8002/backend/bili/getBilibiliById/' + biliUuid)
       .then((response) => response.json())
       .then((responseData) => {       // 获取到的数据处理
         this.setState({
           biliData: responseData.data,
-          videoUrl:responseData.data.biliVideo,
+          videoUrl: responseData.data.biliVideo,
         })
+        this.forceUpdate();
 
+      })
+      .catch((error) => { })
+      .done();
+  }
+  _fetchCountCollection = (biliUuid, userUuid) => {
+    fetch('http://' + ipv4Address + ':8002/backend/collect/countCollections/' + '?userUuid02=' + userUuid + '&biliUuid=' + biliUuid)
+      .then((response) => response.json())
+      .then((responseData) => {
+        const count = responseData.data;
+        var iserr = false;
+
+        if (0 != count) {
+          iserr = true;
+        }
+        this.setState({
+          iscollecting: iserr,
+          iscollectingLoad: true,
+        })
       })
       .catch((error) => { })
       .done();
   }
 
 
+  _fetchToAddCollection = (userUuid, userName, userUuid02, biliUuid, biliName, biliPicture, biliAirplay, biliAmountOfPlay) => {
+    let formData = new FormData();
+    formData.append("userUuid", userUuid);
+    formData.append("userName", userName);
+    formData.append("userUuid02", userUuid02);
+    formData.append("biliUuid", biliUuid);
+    formData.append("biliName", biliName);
+    formData.append("biliPicture", biliPicture);
+    formData.append("biliAirplay", biliAirplay);
+    formData.append("biliAmountOfPlay", biliAmountOfPlay);
+    const url = "http://" + ipv4Address + ":8002/backend/collect/saveCollection/";
+    var opts = {
+      method: "POST",   //请求方法
+      body: formData,
+      headers: {
+      }
+    };
+    fetch(url, opts)
+
+      .then((response) => {
+        if (response.ok) {
+          return response.json();
+        }
+      })
+      .then((json) => {       // 获取到的数据处理
+        const msg = json.msg;
+        const code = json.code;
+        if (code == 0) {
+          this.setState({
+            iscollecting: true,
+          })
+        }
+
+      })
+      .catch((error) => { })
+      .done();
+  }
+
+  _fetchToDeleteCollection = (userUuid02, biliUuid) => {
+    let formData = new FormData();
+    formData.append("userUuid02", userUuid02);
+    formData.append("biliUuid", biliUuid);
+    const url = "http://" + ipv4Address + ":8002/backend/collect/deleteCollection/";
+    var opts = {
+      method: "POST",   //请求方法
+      body: formData,
+      headers: {
+      }
+    };
+    fetch(url, opts)
+
+      .then((response) => {
+        if (response.ok) {
+          return response.json();
+        }
+      })
+      .then((json) => {       // 获取到的数据处理
+        const msg = json.msg;
+        const code = json.code;
+        const deleteCollection = json.data;
+        if (code == 0 && deleteCollection != 0) {
+          this.setState({
+            iscollecting: false,
+          })
+        }
+
+      })
+      .catch((error) => { })
+      .done();
+  }
+
   render() {
+    if (!this.state.iscollectingLoad) {
+      if (this.state.isLoadmenu) {
+        this._fetchCountCollection(this.state.biliUuid, this.state.userUuid);
+      }
+    }
     return (
       <View style={styles.container} onLayout={this._onLayout}>
-        {/* {this.setState({
-          biliUuid: this.props.navigation.state.biliUuid
-        })} */}
+
         {/* 标题栏 */}
         <View style={{ height: 45, width: "100%", backgroundColor: '#000', flexDirection: 'row', }}>
           <TouchableOpacity style={{ height: 25, width: 25, position: 'absolute', left: '5%', paddingTop: 12 }}
@@ -85,7 +192,7 @@ export default class VideoPlayScreen extends React.Component {
         <View style={{ width: this.state.videoWidth, height: this.state.videoHeight, backgroundColor: '#000000' }}>
           <Video
             ref={(ref) => this.videoPlayer = ref}
-            source={{ uri: this.state.videoUrl}}
+            source={{ uri: this.state.videoUrl }}
             rate={1.0}
             volume={1.0}
             muted={false}
@@ -177,36 +284,39 @@ export default class VideoPlayScreen extends React.Component {
 
         {/* 标题等 */}
         <View style={{ width: "100%", height: 175, marginTop: 10 }}>
-          <View style={{ flexDirection: "row", marginLeft: 10, }}>
+          <View style={{ flexDirection: "row", marginLeft: 10, width: '100%' }}>
             <View style={{ width: 40, height: 40, borderRadius: 50, overflow: 'hidden' }}>
               <Image source={{ uri: this.state.biliData.biliPicture }}
-                style={{ width: 40, height: 40, borderRadius: 50, overflow: 'hidden' }}></Image>
-
+                style={{ width: 40, height: 40, borderRadius: 50, overflow: 'hidden' }} />
             </View>
-            <View style={{ flexDirection: 'column', marginLeft: 10, marginRight: 340 }}>
+            <View style={{ flexDirection: 'column', marginLeft: 10, marginRight: 200 }}>
               <Text style={{ fontSize: 15 }}>{this.state.biliData.userName}</Text>
               <Text style={{ fontSize: 10, color: '#ADADAD' }}>{this.state.biliData.userFans}粉丝</Text>
             </View>
-            <Button
-              title="+ 关注"
-            >
-            </Button>
+            <Button style={{}} title="+ 关注" />
           </View>
-          <View></View>
+
+          <Text style={{ paddingLeft: 5 }}>{this.state.biliData.biliName}</Text>
+
           <View style={{ flexDirection: 'row', height: 17, marginTop: 10, marginBottom: 10 }}>
             <Image style={{ width: 12, height: 12, marginLeft: 10 }}
               source={require('../../res/images/videopic/ic_btn_player_danmaku_options_block_bottom_disabled.png')}></Image>
             <Text style={{ fontSize: 10, marginLeft: 5 }}>{this.state.biliData.biliAmountOfPlay}</Text>
             <Image style={{ width: 12, height: 12, marginLeft: 15 }} source={require('../../res/images/videopic/ic_danmu.png')}></Image>
             <Text style={{ fontSize: 10, marginLeft: 10 }}>{this.state.biliData.biliAirplay}</Text>
-            {/* 关注被顶到看不见 */}
             <Text style={{ fontSize: 10, marginLeft: 20 }}>{this.state.biliData.gmtCreate}{/*xx小时前*/}</Text>
             <View style={{ height: 17, marginLeft: 240 }}>
-              <Text style={{ position: "absolute", right: 10 }}>未经作者授权禁止转载</Text>
+              <Text style={{ fontSize: 10, position: "absolute", right: 37 }}>未经作者授权禁止转载</Text>
             </View>
           </View>
-          <Text style={{ flexDirection: 'column', marginLeft: 10, }}> {this.state.biliData.biliBriefIntroduction}</Text>
 
+          <Text style={{ flexDirection: 'column', marginLeft: 10, }}> {this.state.biliData.biliBriefIntroduction}</Text>
+          <TouchableOpacity style={{ alignItems: 'center' }} activeOpacity={0.3} onPress={() => { this.onCollectionPress() }}>
+            <Image
+              style={styles.shrinkControl}
+              source={this.state.iscollecting ? require('../../res/images/videopic/ic_column_input_star.png') : require('../../res/images/videopic/ic_column_input_unstar.png')}
+            />
+          </TouchableOpacity>
         </View>
 
 
@@ -216,6 +326,48 @@ export default class VideoPlayScreen extends React.Component {
 
 
   /// -------Video组件回调事件-------
+
+  onCollectionPress = () => {
+    if (!this.state.isLoadmenu) {
+      return (
+        Alert.alert('没有登录!', '跳转登录', [{ text: '取消', },
+        {
+          text: '确定', onPress: () => {
+            this.props.navigation.navigate('UserScreen', { userUuid: this.state.userUuid, userPicture: this.state.userPicture, userAccount: this.state.userAccount, isLoadmenu: this.state.isLoadmenu });
+          }
+        },]))
+    }
+    if (!this.state.iscollecting) {
+
+      this._fetchToAddCollection(this.state.biliData.userUuid, this.state.biliData.userName, this.state.userUuid, this.state.biliUuid,
+        this.state.biliData.biliName, this.state.biliData.biliPicture, this.state.biliData.biliAirplay, this.state.biliData.biliAmountOfPlay)
+    } else {
+      this._fetchToDeleteCollection(this.state.userUuid, this.state.biliUuid);
+    }
+  }
+  _retrieveData = () => {
+    try {
+      AsyncStorage.getItem('data',
+        (error, result) => {
+          if (error) {
+            alert('取值失败:' + error);
+          } else {
+            const json = JSON.parse(result);
+            if (json != null) {
+              this.setState({
+                userUuid: json.userUuid,
+                isLoadmenu: true,
+              })
+              ToastAndroid.show("返回成功 ", ToastAndroid.SHORT);
+            }
+          }
+        }
+      )
+    } catch (error) {
+      alert('失败' + error);
+    }
+
+  }
 
   _onLoadStart = () => {
     console.log('视频开始加载');
@@ -253,6 +405,7 @@ export default class VideoPlayScreen extends React.Component {
   _onPlayError = () => {
     console.log('视频播放失败');
   };
+
 
   ///-------控件点击事件-------
 

@@ -4,6 +4,8 @@ import {
     Text, View, Image, ListView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import VideoPlayScreen from './VideoPlayScreen';
+
+const ipv4Address  = '10.4.122.130';//本机
 export default class toViewScreen extends React.Component {
     static navigationOptions = {
         header: null
@@ -33,16 +35,7 @@ export default class toViewScreen extends React.Component {
         this.topList(this.state.classify01)
     }
     _fetchToViewData = (biliClassify01, biliClassify02) => {
-        fetch('http://10.2.200.119:8002/backend/bili/listBilibilis/' + '?biliClassify01=' + biliClassify01 + '&biliClassify02=' + biliClassify02
-            // , {
-            // method: 'GET',
-            // headers: {
-            //     // 'Accept': 'application/json',
-            //     // 'Content-Type': 'application/json',
-            //     'biliClassify01': biliClassify01,
-            //     'biliClassify02': biliClassify02,
-            // },
-            // }
+        fetch('http://'+ipv4Address+':8002/backend/bili/listBilibilis/' + '?biliClassify01=' + biliClassify01 + '&biliClassify02=' + biliClassify02
         )
             .then((response) => response.json())
             .then((responseData) => {       // 获取到的数据处理

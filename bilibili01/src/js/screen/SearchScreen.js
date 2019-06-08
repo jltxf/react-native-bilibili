@@ -3,7 +3,7 @@ import {
     FlatList, StyleSheet, View, Text, Image, TextInput, TouchableOpacity,
 } from 'react-native';
 
-
+const ipv4Address = '10.4.122.130';//本机
 export default class SearchScreen extends Component {
     static navigationOptions = {
         header: null,
@@ -20,7 +20,7 @@ export default class SearchScreen extends Component {
         };
     }
     _fetchSearchData = (Uuid) => {
-        fetch('http://10.2.200.119:8002/backend/bili/listBiliByBiliNameOrUserName/' + Uuid)
+        fetch('http://' + ipv4Address + ':8002/backend/bili/listBiliByBiliNameOrUserName/' + Uuid)
 
             .then((response) => response.json())
             .then((responseData) => {       // 获取到的数据处理

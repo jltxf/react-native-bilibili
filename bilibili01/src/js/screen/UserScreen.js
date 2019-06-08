@@ -1,9 +1,11 @@
 import React from "react";
 import {
     FlatList, SectionList, TextInput, Button, ImageBackground, AsyncStorage,
-    Text, View, Image, ListView, TouchableOpacity, ActivityIndicator,
+    Text, View, Image, ListView, TouchableOpacity, ActivityIndicator, ToastAndroid,
 } from 'react-native';
 import VideoPlayScreen from './VideoPlayScreen';
+
+const ipv4Address = '10.4.122.130';//本机
 function toQueryString(obj) {
     return obj ? Object.keys(obj).sort().map(function (key) {
         var val = obj[key];
@@ -23,16 +25,20 @@ export default class toViewScreen extends React.Component {
 
     constructor(props) {
         super(props)
+
         this.state = {
             data: [],
             navigateer: [],
 
             refreshing: false,//当前的刷新状态
             userName: '',
-            userUuid: '',
+            userUuid: props.navigation.state.params.userUuid,
             userAccount: props.navigation.state.params.userAccount,
             userPicture: props.navigation.state.params.userPicture,
-            isLoadmenu: props.navigation.state.params.isLoadmenu,
+            isLoadmenu: props.navigation.state.params.isLoadmenu,//是否是进入个人界面判别
+            // userAccount: '',
+            // userPicture: '',
+            // isLoadmenu: '',
             userPwd: '',
             userNewPwd: '',
 
@@ -47,29 +53,35 @@ export default class toViewScreen extends React.Component {
             isLogining: false,//登录注册判别
             isasncLoad: false,//数据持久化判别
             isasncadd: false,//数据持久化判别
+            iscollection: false,//是否更新过收藏
+
+            //收藏
+            collectionData: [],
         }
     }
 
     componentDidMount() {
-        this._retrieveData();
+        this._retrievegain();
     }
     _fetchToLogin = (userAccount, userPwd) => {
-        fetch('http://10.2.200.119:8002/backend/user/getUserByLogin/' + '?userAccount=' + userAccount + '&userPwd=' + userPwd
+        fetch('http://' + ipv4Address + ':8002/backend/user/getUserByLogin/' + '?userAccount=' + userAccount + '&userPwd=' + userPwd
         )
             .then((response) => response.json())
             .then((responseData) => {       // 获取到的数据处理
                 const msg = responseData.msg;
                 const code = responseData.code;
-                this.setState({
-                    data: responseData.data,
-                    userAccount: responseData.data.userAccount,
-                    userPicture: responseData.data.userPicture,
-                    userUuid: responseData.data.userUuid,
-                    isLoading: false,
-                })
-                this._storeData(responseData.data.userAccount, responseData.data.userPicture, responseData.data.userUuid)
-
+                if (code == 0) {
+                    this._storeData(responseData.data.userAccount, responseData.data.userPicture, responseData.data.userUuid);
+                    this.setState({
+                        data: responseData.data,
+                        userAccount: responseData.data.userAccount,
+                        userPicture: responseData.data.userPicture,
+                        userUuid: responseData.data.userUuid,
+                        isLoading: false,
+                    })
+                }
             })
+
             .catch((error) => {
                 this.setState({
                     error: true,
@@ -79,26 +91,15 @@ export default class toViewScreen extends React.Component {
             .done();
     }
 
+
+
     _fetchToRegister = (userAccount, userName, userPwd, userNewPwd) => {
-        //Post方法, 需要请求体body
-        /*
-        * FromData
-        * 主要用于序列化表单以及创建与表单格式相同的数据
-        *
-        * var data = new FormData();
-        * data.append("name","hello");
-        * append方法接收两个参数,键和值(key,value),分别表示表单字段的名字 和 字段的值,可添加多个
-        *
-        * 在jQuery中,"key1=value1&key2=valu2" 作为参数传入对象框架,会自动分装成FormData形式
-        * 在Fetch 中,进行post进行post请求,需要自动创建FormData对象传给body
-        *
-        * */
         let formData = new FormData();
         formData.append("userAccount", userAccount);
         formData.append("userName", userName);
         formData.append("userPwd", userPwd);
         formData.append("userNewPwd", userNewPwd);
-        const url = "http://10.2.200.119:8002/backend/user/saveUser/";
+        const url = "http://" + ipv4Address + ":8002/backend/user/saveUser/";
         var opts = {
             method: "POST",   //请求方法
             body: formData,
@@ -115,16 +116,37 @@ export default class toViewScreen extends React.Component {
             .then((json) => {       // 获取到的数据处理
                 const msg = json.msg;
                 const code = json.code;
+                if (code == 0) {
+                    this._storeData(json.data.userAccount, json.data.userPicture, json.data.userUuid);
+                    this.setState({
+                        data: json.data,
+                        userAccount: json.data.userAccount,
+                        userPicture: json.data.userPicture,
+                        userUuid: json.data.userUuid,
+                        isLoading: false,
+                    })
+                }
+            })
+            .catch((error) => {
                 this.setState({
-                    data: json.data,
-                    userAccount: json.data.userAccount,
-                    userPicture: json.data.userPicture,
-                    userUuid: json.data.userUuid,
-                    isLoading: false,
-
-
+                    error: true,
+                    errorInfo: error
                 })
+            })
+            .done();
+    }
 
+    _fetchToCollectionOfUserUuid02 = (userUuid02) => {
+        fetch('http://' + ipv4Address + ':8002/backend/collect/listCollections/' + '?userUuid02=' + userUuid02
+        )
+            .then((response) => response.json())
+            .then((responseData) => {       // 获取到的数据处理
+                const msg = responseData.msg;
+                const code = responseData.code;
+                this.setState({
+                    collectionData: responseData.data,
+                    iscollection: true,
+                })
             })
             .catch((error) => {
                 this.setState({
@@ -138,12 +160,12 @@ export default class toViewScreen extends React.Component {
         return (
             <View style={{ flex: 1 }}>
 
-                <ImageBackground style={{ height: 120, width: "100%", backgroundColor: '#1C86EE', flexDirection: 'row', }} source={require('../../res/images/register/ic_group_header_bg.png')}>
+                <ImageBackground style={{ height: 120, width: "100%", backgroundColor: '#1C86EE', flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1C86EE', marginBottom: 220 }} source={require('../../res/images/register/ic_group_header_bg.png')}>
                     <TouchableOpacity style={{ height: 25, width: 25, position: 'absolute', left: '5%', paddingTop: 17 }}
                         //回退页面
                         onPress={() => {
-                            // this.props.navigation.goBack()
-                            this.props.navigation.navigate('UserScreen', { userPicture: this.state.userPicture, userName: this.state.userName });
+                            this.props.navigation.goBack()
+                            // this.props.navigation.navigate('UserScreen', { userPicture: this.state.userPicture, userName: this.state.userName });
                         }}>
                         <Image source={require('../../res/images/toBar/abc_ic_ab_back_mtrl_am_alpha.png')} style={{ height: 25, width: 25 }} />
                     </TouchableOpacity>
@@ -152,17 +174,26 @@ export default class toViewScreen extends React.Component {
                             <Image style={{ height: 80, width: 80 }} source={{ uri: this.state.userPicture }} />
                         </View>
                         <Text style={{ paddingLeft: 10, paddingTop: 10, color: '#1C86EE' }}>{this.state.userAccount}</Text>
-                        <Text style={{ paddingLeft: 10, paddingTop: 10, color: '#1C86EE' }}>{this.state.userUuid}</Text>
                     </View>
-                    <Button onPress={
+
+                    <TouchableOpacity onPress={
                         () => {
                             this._retrieveRemove();
                             this.props.navigation.goBack();
                         }
                     }
-                        title="退出"></Button>
+                        style={{ position: 'absolute', right: '2%', top: '5%', height: 20, width: 60, backgroundColor: '#1C86EE', alignItems: 'center' }}
+                    >
+                        <Text style={{ color: '#FFF' }}>退出</Text>
+                    </TouchableOpacity>
                 </ImageBackground>
 
+                <FlatList
+                    extraData={this.state}
+                    renderItem={(item, index) => this.renderRow(item, index)}
+                    data={this.state.collectionData}
+                    keyExtractor={this._keyExtractor}
+                />
             </View>
         )
     }
@@ -211,6 +242,7 @@ export default class toViewScreen extends React.Component {
                         onChangeText={(userPwd) => this.setState({ userPwd })}
                         placeholderTextColor='#021'
                         placeholder='请输入密码'
+                        secureTextEntry={true}
                         style={{ width: 270 }}
                         underlineColorAndroid='#000'
                     />
@@ -220,10 +252,11 @@ export default class toViewScreen extends React.Component {
                         onChangeText={(userNewPwd) => this.setState({ userNewPwd })}
                         placeholderTextColor='#021'
                         placeholder='再次输入密码'
+                        secureTextEntry={true}
                         style={{ width: 270 }}
                         underlineColorAndroid='#000'
                     />
-                    <Text>{this.state.userAccount + this.state.userName + this.state.userPwd + this.state.userNewPwd}</Text>
+
                     <View style={{ flexDirection: 'row', width: 270, justifyContent: 'center' }}>
                         <TouchableOpacity style={{ width: 100, height: 30, alignItems: 'center', backgroundColor: '#1C86EE', justifyContent: 'center' }}
                             onPress={
@@ -278,6 +311,7 @@ export default class toViewScreen extends React.Component {
                         onChangeText={(userPwd) => this.setState({ userPwd })}
                         placeholderTextColor='#021'
                         placeholder='请输入密码'
+                        secureTextEntry={true}
                         style={{ width: 270 }}
                         underlineColorAndroid='#000'
                     />
@@ -311,9 +345,15 @@ export default class toViewScreen extends React.Component {
 
     render() {
         if (!this.state.isLoading) {
+            if (!this.state.iscollection) {
+                this._fetchToCollectionOfUserUuid02(this.state.userUuid);
+            }
             return this.renderMenu();
         }
         else if (this.state.isLoadmenu) {
+            if (!this.state.iscollection) {
+                this._fetchToCollectionOfUserUuid02(this.state.userUuid);
+            }
             return this.renderMenu();
         }
         else if (this.state.isLogining) {
@@ -331,6 +371,31 @@ export default class toViewScreen extends React.Component {
                 <Text style={{ fontSize: 20, color: 'red' }}>没有访问到数据</Text>
             </View>
         );
+    }
+
+    renderRow(rowData) {
+        return <TouchableOpacity style={{ flex: 1, flexDirection: 'row' }} onPress={() => {
+            this.props.navigation.navigate('VideoPlayScreen', { biliUuid: rowData.item.biliUuid })
+        }
+        }  >
+            <Image style={{ height: 90, width: 120, }} source={{ uri: rowData.item.biliPicture }}></Image>
+            <View style={{ flexDirection: 'column', marginTop: 15, }}>
+                <Text style={{ paddingBottom: 2, paddingTop: 2, paddingLeft: 2 }}>{rowData.item.biliName}</Text>
+                <View style={{ flexDirection: 'row', height: 17, marginTop: 2, }}>
+                    <Image style={{ width: 12, height: 12, marginLeft: 10 }}
+                        source={require('../../res/images/videopic/ic_address_book2.png')} />
+                    <Text style={{ fontSize: 10, marginLeft: 5 }}>{rowData.item.userName}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', height: 17, marginTop: 2, marginBottom: 10 }}>
+                    <Image style={{ width: 12, height: 12, marginLeft: 10 }}
+                        source={require('../../res/images/videopic/ic_btn_player_danmaku_options_block_bottom_disabled.png')}></Image>
+                    <Text style={{ fontSize: 10, marginLeft: 5 }}>{rowData.item.biliAmountOfPlay}</Text>
+                    <Image style={{ width: 12, height: 12, marginLeft: 15 }} source={require('../../res/images/videopic/ic_danmu.png')}></Image>
+                    <Text style={{ fontSize: 10, marginLeft: 10 }}>{rowData.item.biliAirplay}</Text>
+                </View>
+            </View>
+
+        </TouchableOpacity>
     }
 
     renderSeparator = () => {
@@ -381,9 +446,10 @@ export default class toViewScreen extends React.Component {
             AsyncStorage.setItem('data', JSON.stringify(data1),
                 (error) => {
                     if (error) {
-                        alert('存值失败:', error);
+                        ToastAndroid.show("存值失败" + error, ToastAndroid.SHORT);
                     } else {
-                        alert('登录成功' + JSON.stringify(data1));
+                        ;
+                        ToastAndroid.show("登录成功", ToastAndroid.SHORT);
                         this.setState({
                             isasncLoad: true,
                             errorInfo: error,
@@ -392,10 +458,10 @@ export default class toViewScreen extends React.Component {
                 }
             );
         } catch (error) {
-            alert('失败' + error);
+            ToastAndroid.show('失败' + error, ToastAndroid.SHORT);
         }
     }
-    _retrieveData = () => {
+    _retrievegain = () => {
         try {
             AsyncStorage.getItem('data',
                 (error, result) => {
@@ -411,13 +477,13 @@ export default class toViewScreen extends React.Component {
                                 isLoadmenu: true,
                                 errorInfo: error,
                             })
-                            // alert('取值成功:' + result);
+                            ToastAndroid.show('取值成功', ToastAndroid.SHORT);
                         }
                     }
                 }
             )
         } catch (error) {
-            alert('失败' + error);
+            ToastAndroid.show('失败' + error, ToastAndroid.SHORT);
         }
     }
     _retrieveRemove() {
@@ -426,12 +492,14 @@ export default class toViewScreen extends React.Component {
                 'data',
                 (error) => {
                     if (!error) {
-                        alert('移除成功');
+                        ToastAndroid.show("移除成功", ToastAndroid.SHORT);
                     }
                 }
             )
         } catch (error) {
-            alert('失败', +error);
+            ToastAndroid.show("移除失败" + error, ToastAndroid.SHORT);
         }
     }
+
+
 }
